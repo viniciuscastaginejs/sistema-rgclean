@@ -230,21 +230,16 @@
     <h1>RG Clean</h1>
     <p class="sub" id="loginSub">Sistema Financeiro</p>
     <div class="field">
-      <label>E-mail</label>
-      <input type="email" id="email" placeholder="seuemail@exemplo.com" autocomplete="username">
+      <label>Usuário</label>
+      <input type="text" id="username" placeholder="Seu usuário" autocomplete="username" autocapitalize="none">
     </div>
     <div class="field">
       <label>Senha</label>
       <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
     </div>
-    <div class="field hidden" id="confirmField">
-      <label>Confirmar senha</label>
-      <input type="password" id="passwordConfirm" placeholder="••••••••">
-    </div>
     <label class="remember"><input type="checkbox" id="remember" checked> Manter conectado neste aparelho</label>
     <div class="login-err" id="loginErr"></div>
     <button class="btn-primary" id="loginBtn">Entrar</button>
-    <p class="login-hint" id="loginHint"></p>
   </div>
 </div>
 
@@ -385,60 +380,30 @@ let txType = 'in';
 let flowChart=null, catChart=null;
 
 /* ========================================================
-   AUTENTICAÇÃO
+   AUTENTICAÇÃO — login fixo (provisório, até migrar pro Supabase)
    ======================================================== */
-async function sha(str){
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
-}
-function getAuth(){ try{return JSON.parse(localStorage.getItem(LS.auth))}catch{return null} }
+const USER = 'gabriel rg clean';   // usuário (não diferencia maiúsculas)
+const PASS = 'rgclean2026';        // senha
 
-function setupLoginUI(){
-  const auth = getAuth();
-  const sub = document.getElementById('loginSub');
-  const hint = document.getElementById('loginHint');
-  const btn = document.getElementById('loginBtn');
-  const confirmField = document.getElementById('confirmField');
-  if(!auth){
-    sub.textContent = 'Primeiro acesso — crie seu login';
-    btn.textContent = 'Criar acesso';
-    confirmField.classList.remove('hidden');
-    hint.textContent = 'Esse e-mail e senha ficam guardados só neste aparelho. Anote a senha — não dá pra recuperar.';
-  } else {
-    sub.textContent = 'Sistema Financeiro';
-    btn.textContent = 'Entrar';
-    confirmField.classList.add('hidden');
-    hint.textContent = '';
-  }
-}
-
-async function handleLogin(){
-  const email = document.getElementById('email').value.trim().toLowerCase();
+function handleLogin(){
+  const user = document.getElementById('username').value.trim().toLowerCase();
   const pass = document.getElementById('password').value;
   const err = document.getElementById('loginErr');
-  const auth = getAuth();
   err.textContent='';
 
-  if(!email || !pass){ err.textContent='Preencha e-mail e senha.'; return; }
+  if(!user || !pass){ err.textContent='Preencha usuário e senha.'; return; }
 
-  if(!auth){ // cadastro
-    const confirm = document.getElementById('passwordConfirm').value;
-    if(pass.length < 4){ err.textContent='Use uma senha de pelo menos 4 caracteres.'; return; }
-    if(pass !== confirm){ err.textContent='As senhas não conferem.'; return; }
-    const hash = await sha(pass);
-    localStorage.setItem(LS.auth, JSON.stringify({email,hash}));
-    openApp(email);
-  } else { // login
-    const hash = await sha(pass);
-    if(email !== auth.email || hash !== auth.hash){ err.textContent='E-mail ou senha incorretos.'; return; }
-    openApp(email);
-  }
-  if(document.getElementById('remember').checked){
-    localStorage.setItem(LS.session, email);
+  if(user === USER && pass === PASS){
+    if(document.getElementById('remember').checked){
+      localStorage.setItem(LS.session, '1');
+    }
+    openApp();
+  } else {
+    err.textContent = 'Usuário ou senha incorretos.';
   }
 }
 
-function openApp(email){
+function openApp(){
   document.getElementById('login').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('fab').classList.remove('hidden');
@@ -728,7 +693,7 @@ function exportPDF(){ window.print(); }
    EVENTOS
    ======================================================== */
 document.getElementById('loginBtn').onclick = handleLogin;
-['email','password','passwordConfirm'].forEach(id=>
+['username','password'].forEach(id=>
   document.getElementById(id).addEventListener('keydown',e=>{ if(e.key==='Enter') handleLogin(); })
 );
 
