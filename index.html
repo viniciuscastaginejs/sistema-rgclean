@@ -143,6 +143,17 @@
   .tx-empty{background:var(--card);border-radius:14px;padding:44px 20px;text-align:center;box-shadow:var(--shadow);color:var(--muted)}
   .tx-empty strong{display:block;color:var(--ink);font-size:15px;margin-bottom:4px}
 
+  /* futuros / previstos */
+  .future-sum{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:12.5px;font-weight:600}
+  .future-sum .fs-in{color:var(--in)}
+  .future-sum .fs-out{color:var(--out)}
+  .future-sum .fs-proj{color:var(--green-800);background:var(--green-50);padding:5px 11px;border-radius:20px}
+  .tx.future{border:1.5px dashed var(--line);box-shadow:none;background:#fcfdfc}
+  .tx.future .ic.in{background:#eafaf0} .tx.future .ic.out{background:#fef0f0}
+  .badge-soon{display:inline-block;background:#fef3c7;color:#92400e;padding:1px 8px;border-radius:20px;font-size:11px;font-weight:600;margin-right:6px}
+  .tx .done{color:var(--in);background:var(--in-soft);padding:7px 11px;border-radius:9px;font-weight:600;font-size:12px;white-space:nowrap}
+  .tx .done:hover{background:var(--in);color:#fff}
+
   /* FAB */
   .fab{
     position:fixed;bottom:24px;right:max(24px,calc(50vw - 540px + 16px));z-index:30;
@@ -253,9 +264,9 @@
   </div>
 
   <div class="summary">
-    <div class="scard in"><div><div class="lbl"><span class="dot g"></span>Entrou</div><div class="val" id="sumIn">R$ 0,00</div></div></div>
-    <div class="scard out"><div><div class="lbl"><span class="dot r"></span>Saiu</div><div class="val" id="sumOut">R$ 0,00</div></div></div>
-    <div class="scard bal"><div><div class="lbl"><span class="dot b"></span>Sobrou no período</div><div class="val" id="sumBal">R$ 0,00</div></div></div>
+    <div class="scard in"><div><div class="lbl"><span class="dot g"></span>Entradas</div><div class="val" id="sumIn">R$ 0,00</div></div></div>
+    <div class="scard out"><div><div class="lbl"><span class="dot r"></span>Saídas</div><div class="val" id="sumOut">R$ 0,00</div></div></div>
+    <div class="scard bal"><div><div class="lbl"><span class="dot b"></span>Saldo do período</div><div class="val" id="sumBal">R$ 0,00</div></div></div>
   </div>
 
   <div class="periodbar">
@@ -288,6 +299,14 @@
     </div>
   </div>
 
+  <div id="futureSection" class="hidden">
+    <div class="tx-head">
+      <h2>Lançamentos futuros</h2>
+      <div class="future-sum" id="futureSum"></div>
+    </div>
+    <div class="tx-list" id="futureList"></div>
+  </div>
+
   <div class="tx-head">
     <h2>Lançamentos</h2>
     <button class="btn-ghost" id="addTop">+ Novo</button>
@@ -303,8 +322,8 @@
     <h2 id="modalTitle">Novo lançamento</h2>
     <p class="msub" id="modalSub">Empresa</p>
     <div class="type-toggle" id="typeToggle">
-      <button data-t="in" class="sel-in">↓ Entrou</button>
-      <button data-t="out">↑ Saiu</button>
+      <button data-t="in" class="sel-in">↓ Entrada</button>
+      <button data-t="out">↑ Saída</button>
     </div>
     <div class="field amt-input">
       <label>Valor</label>
@@ -321,7 +340,7 @@
         <select id="fCat"></select>
       </div>
       <div class="field">
-        <label>Data</label>
+        <label>Data <span style="font-weight:400;color:var(--muted)">· futura = agendado</span></label>
         <input type="date" id="fDate">
       </div>
     </div>
@@ -350,7 +369,7 @@ const BRL = n => n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const CATS = {
   empresa:{
     in:['Higienização de sofá','Impermeabilização','Tapetes','Cadeiras e poltronas','Colchões','Corporativo','Outros'],
-    out:['Produtos','Combustível','Marketing','Impostos','Equipamento','Manutenção','Salários','Outros']
+    out:['Produtos','Combustível','Marketing','Impostos','Equipamento','Manutenção','Salários','Retirada pessoal','Outros']
   },
   pessoal:{
     in:['Salário','Pró-labore','Freela','Investimentos','Outros'],
@@ -465,10 +484,28 @@ function periodRange(){
   }
   return {from,to};
 }
+function endOfToday(){ const t=new Date(); t.setHours(23,59,59,999); return t; }
+
 function filtered(){
   const {from,to}=periodRange();
-  return state[ctx].filter(t=>{ const d=new Date(t.date+'T12:00:00'); return d>=from && d<=to; })
+  const today = endOfToday();
+  const realTo = to < today ? to : today; // realizados nunca passam de hoje
+  return state[ctx].filter(t=>{ const d=new Date(t.date+'T12:00:00'); return d>=from && d<=realTo; })
     .sort((a,b)=> b.date.localeCompare(a.date) || b.id-a.id);
+}
+
+// lançamentos com data futura (independente do período selecionado)
+function futureTx(){
+  const today = endOfToday();
+  return state[ctx].filter(t=> new Date(t.date+'T12:00:00') > today)
+    .sort((a,b)=> a.date.localeCompare(b.date) || a.id-b.id);
+}
+
+// saldo real de caixa hoje (todo o histórico realizado)
+function caixaAtual(){
+  const today = endOfToday();
+  return state[ctx].filter(t=> new Date(t.date+'T12:00:00') <= today)
+    .reduce((s,t)=> s + (t.type==='in'? t.amount : -t.amount), 0);
 }
 
 /* ========================================================
@@ -485,6 +522,61 @@ function render(){
   renderList(list);
   renderFlow(list);
   renderCat(list);
+  renderFuture();
+  bindTxActions();
+}
+
+// monta o HTML de um lançamento (realizado ou futuro)
+function txItemHTML(t, future){
+  const d = new Date(t.date+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'});
+  const meta = future
+    ? `<span class="badge-soon">Previsto</span>${esc(t.category)} · ${d}`
+    : `<span class="cat-tag">${esc(t.category)}</span>${d}`;
+  const actions = future
+    ? `<button class="done" data-done="${t.id}" title="Confirmar que aconteceu">✓ Concluir</button><button class="del" data-del="${t.id}" title="Excluir">✕</button>`
+    : `<button class="del" data-del="${t.id}" title="Excluir">✕</button>`;
+  return `<div class="tx ${future?'future':''}">
+    <div class="ic ${t.type}">${t.type==='in'?'↓':'↑'}</div>
+    <div class="info">
+      <div class="desc">${esc(t.description||t.category)}</div>
+      <div class="meta">${meta}</div>
+    </div>
+    <div class="amt ${t.type}">${t.type==='in'?'+':'−'} ${BRL(t.amount)}</div>
+    ${actions}
+  </div>`;
+}
+
+function bindTxActions(){
+  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{
+    if(confirm('Excluir este lançamento?')) delTx(Number(b.dataset.del));
+  });
+  document.querySelectorAll('[data-done]').forEach(b=>b.onclick=()=>concludeTx(Number(b.dataset.done)));
+}
+
+function concludeTx(id){
+  const t = state[ctx].find(x=>x.id===id);
+  if(!t) return;
+  t.date = new Date().toISOString().slice(0,10); // passa a valer pra hoje
+  saveData(); render();
+  toast('Lançamento concluído');
+}
+
+function renderFuture(){
+  const fut = futureTx();
+  const sec = document.getElementById('futureSection');
+  if(!fut.length){ sec.classList.add('hidden'); return; }
+  sec.classList.remove('hidden');
+
+  const aReceber = fut.filter(t=>t.type==='in').reduce((s,t)=>s+t.amount,0);
+  const aPagar = fut.filter(t=>t.type==='out').reduce((s,t)=>s+t.amount,0);
+  const previsto = caixaAtual() + aReceber - aPagar;
+
+  document.getElementById('futureSum').innerHTML =
+    `<span class="fs-in">A receber ${BRL(aReceber)}</span>` +
+    `<span class="fs-out">A pagar ${BRL(aPagar)}</span>` +
+    `<span class="fs-proj">Saldo previsto ${BRL(previsto)}</span>`;
+
+  document.getElementById('futureList').innerHTML = fut.map(t=>txItemHTML(t,true)).join('');
 }
 
 function renderList(list){
@@ -493,21 +585,7 @@ function renderList(list){
     el.innerHTML = `<div class="tx-empty"><strong>Nenhum lançamento neste período</strong>Toque em "Lançar" pra registrar a primeira entrada ou saída.</div>`;
     return;
   }
-  el.innerHTML = list.map(t=>{
-    const d = new Date(t.date+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'});
-    return `<div class="tx">
-      <div class="ic ${t.type}">${t.type==='in'?'↓':'↑'}</div>
-      <div class="info">
-        <div class="desc">${esc(t.description||t.category)}</div>
-        <div class="meta"><span class="cat-tag">${esc(t.category)}</span>${d}</div>
-      </div>
-      <div class="amt ${t.type}">${t.type==='in'?'+':'−'} ${BRL(t.amount)}</div>
-      <button class="del" data-del="${t.id}" title="Excluir">✕</button>
-    </div>`;
-  }).join('');
-  el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{
-    if(confirm('Excluir este lançamento?')) delTx(Number(b.dataset.del));
-  });
+  el.innerHTML = list.map(t=>txItemHTML(t,false)).join('');
 }
 
 function renderFlow(list){
@@ -597,16 +675,19 @@ function closeModal(){ document.getElementById('overlay').classList.add('hidden'
 function saveTx(){
   const amount = parseFloat(document.getElementById('fAmount').value);
   if(!amount || amount<=0){ document.getElementById('fAmount').focus(); return; }
+  const date = document.getElementById('fDate').value;
   addTx({
     id: Date.now(),
     type: txType,
     amount,
     description: document.getElementById('fDesc').value.trim(),
     category: document.getElementById('fCat').value,
-    date: document.getElementById('fDate').value
+    date
   });
   closeModal(); render();
-  toast(txType==='in'?'Entrada registrada':'Saída registrada');
+  const isFuture = new Date(date+'T12:00:00') > endOfToday();
+  if(isFuture) toast(txType==='in'?'Agendado como a receber':'Agendado como a pagar');
+  else toast(txType==='in'?'Entrada registrada':'Saída registrada');
 }
 
 let toastTimer;
