@@ -38,34 +38,14 @@
   input,select{font-family:inherit;font-size:16px}
   .hidden{display:none!important}
 
-  /* ===== LOGIN ===== */
-  #login{
-    min-height:100dvh;display:grid;place-items:center;padding:24px;
-    background:radial-gradient(120% 90% at 50% -10%,var(--green-700),var(--green-900));
-  }
-  .login-card{
-    width:100%;max-width:380px;background:var(--card);border-radius:24px;
-    padding:36px 30px;box-shadow:0 30px 80px rgba(0,0,0,.35);text-align:center;
-  }
-  .login-card img{width:64px;height:64px;border-radius:16px;object-fit:cover;margin-bottom:14px}
-  .login-card h1{font-size:20px;letter-spacing:-.01em}
-  .login-card .sub{color:var(--muted);font-size:13.5px;margin:6px 0 26px}
-  .field{text-align:left;margin-bottom:14px}
+  /* ===== shared form bits (usados pelo modal) ===== */
+  .field{margin-bottom:14px}
   .field label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:6px}
-  .field input{
-    width:100%;padding:13px 14px;border:1.5px solid var(--line);border-radius:12px;
-    background:#fbfdfc;transition:border-color .15s;
-  }
-  .field input:focus{outline:none;border-color:var(--green-500)}
   .btn-primary{
     width:100%;padding:14px;background:var(--green-700);color:#fff;border-radius:12px;
-    font-weight:600;font-size:15px;transition:background .15s;margin-top:6px;
+    font-weight:600;font-size:15px;transition:background .15s;
   }
   .btn-primary:hover{background:var(--green-800)}
-  .remember{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin:4px 0 16px;text-align:left}
-  .remember input{width:16px;height:16px;accent-color:var(--green-700)}
-  .login-err{color:var(--out);font-size:13px;margin-bottom:10px;min-height:18px;text-align:left}
-  .login-hint{margin-top:18px;font-size:12px;color:var(--muted);line-height:1.5}
 
   /* ===== APP SHELL ===== */
   #app{max-width:1080px;margin:0 auto;padding:0 16px 120px}
@@ -223,28 +203,8 @@
 </head>
 <body>
 
-<!-- ===================== LOGIN ===================== -->
-<div id="login">
-  <div class="login-card">
-    <img src="https://res.cloudinary.com/dtdomrtyp/image/upload/f_auto,q_auto,w_128/v1780940763/PHOTO-2026-06-08-14-26-08_oxeq64.jpg" alt="RG Clean">
-    <h1>RG Clean</h1>
-    <p class="sub" id="loginSub">Sistema Financeiro</p>
-    <div class="field">
-      <label>Usuário</label>
-      <input type="text" id="username" placeholder="Seu usuário" autocomplete="username" autocapitalize="none">
-    </div>
-    <div class="field">
-      <label>Senha</label>
-      <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
-    </div>
-    <label class="remember"><input type="checkbox" id="remember" checked> Manter conectado neste aparelho</label>
-    <div class="login-err" id="loginErr"></div>
-    <button class="btn-primary" id="loginBtn">Entrar</button>
-  </div>
-</div>
-
 <!-- ===================== APP ===================== -->
-<div id="app" class="hidden">
+<div id="app">
   <div class="topbar">
     <div class="brand">
       <img src="https://res.cloudinary.com/dtdomrtyp/image/upload/f_auto,q_auto,w_72/v1780940763/PHOTO-2026-06-08-14-26-08_oxeq64.jpg" alt="">
@@ -255,7 +215,6 @@
       <button data-ctx="empresa" class="active">Empresa</button>
       <button data-ctx="pessoal">Pessoal</button>
     </div>
-    <button class="icon-btn" id="logoutBtn" title="Sair">⎋</button>
   </div>
 
   <div class="summary">
@@ -309,7 +268,7 @@
   <div class="tx-list" id="txList"></div>
 </div>
 
-<button class="fab hidden" id="fab"><span class="plus">+</span><span class="label">Lançar</span></button>
+<button class="fab" id="fab"><span class="plus">+</span><span class="label">Lançar</span></button>
 
 <!-- ===================== MODAL ===================== -->
 <div class="overlay hidden" id="overlay">
@@ -380,40 +339,11 @@ let txType = 'in';
 let flowChart=null, catChart=null;
 
 /* ========================================================
-   AUTENTICAÇÃO — login fixo (provisório, até migrar pro Supabase)
+   APP
    ======================================================== */
-const USER = 'gabriel rg clean';   // usuário (não diferencia maiúsculas)
-const PASS = 'rgclean2026';        // senha
-
-function handleLogin(){
-  const user = document.getElementById('username').value.trim().toLowerCase();
-  const pass = document.getElementById('password').value;
-  const err = document.getElementById('loginErr');
-  err.textContent='';
-
-  if(!user || !pass){ err.textContent='Preencha usuário e senha.'; return; }
-
-  if(user === USER && pass === PASS){
-    if(document.getElementById('remember').checked){
-      localStorage.setItem(LS.session, '1');
-    }
-    openApp();
-  } else {
-    err.textContent = 'Usuário ou senha incorretos.';
-  }
-}
-
 function openApp(){
-  document.getElementById('login').classList.add('hidden');
-  document.getElementById('app').classList.remove('hidden');
-  document.getElementById('fab').classList.remove('hidden');
   loadData();
   render();
-}
-
-function logout(){
-  localStorage.removeItem(LS.session);
-  location.reload();
 }
 
 /* ========================================================
@@ -692,12 +622,6 @@ function exportPDF(){ window.print(); }
 /* ========================================================
    EVENTOS
    ======================================================== */
-document.getElementById('loginBtn').onclick = handleLogin;
-['username','password'].forEach(id=>
-  document.getElementById(id).addEventListener('keydown',e=>{ if(e.key==='Enter') handleLogin(); })
-);
-
-document.getElementById('logoutBtn').onclick = logout;
 document.getElementById('fab').onclick = openModal;
 document.getElementById('addTop').onclick = openModal;
 document.getElementById('cancelBtn').onclick = closeModal;
@@ -730,12 +654,7 @@ document.querySelectorAll('#periodSeg button').forEach(b=>b.onclick=()=>{
    BOOT
    ======================================================== */
 (function init(){
-  setupLoginUI();
-  const session = localStorage.getItem(LS.session);
-  const auth = getAuth();
-  if(session && auth && session===auth.email){
-    openApp(session);
-  }
+  openApp();
 })();
 </script>
 </body>
